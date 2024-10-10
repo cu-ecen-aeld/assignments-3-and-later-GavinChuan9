@@ -1,0 +1,5 @@
+root@05cc5c9e19b4:/workspace/aeld# aarch64-none-linux-gnu-gcc -print-sysroot -v
+Using built-in specs.
+COLLECT_GCC=aarch64-none-linux-gnu-gcc
+COLLECT_LTO_WRAPPER=/workspace/aeld/install/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/../libexec/gcc/aarch64-none-linux-gnu/13.3.1/lto-wrapper
+/workspace/aeld/install/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/../aarch64-none-linux-gnu/libc
