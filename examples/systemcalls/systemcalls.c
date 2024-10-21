@@ -1,4 +1,9 @@
 #include "systemcalls.h"
+#include <stdlib.h>     // system()
+#include <unistd.h>     // execv()
+#include <sys/types.h>  // pid_t
+#include <sys/wait.h>   // wait()
+#include <fcntl.h>      // O_WRONLY|O_TRUNC|O_CREAT
 
 /**
  * @param cmd the command to execute with system()
@@ -17,7 +22,11 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int retVal = system(cmd);
+    if(!retVal)
+        return true;
+    else
+        return false;
 }
 
 /**
@@ -58,10 +67,40 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    bool retVal = false;
+    pid_t pid = fork();
+
+    // execv()
+    if(pid < 0)
+        retVal = false;
+    else if(pid == 0){
+        // Child process
+        execv(command[0], command);
+        perror("execv failed");
+        exit(EXIT_FAILURE);
+    }else{
+        // Parent process
+        int status;
+        wait(&status);
+
+        if(WIFEXITED(status)){
+            // printf("Child exited with status: %d\n", WEXITSTATUS(status));
+            if(WEXITSTATUS(status) == EXIT_FAILURE){
+                // Child terminated abnormally.
+                retVal = false;
+            }else{
+                // Child terminated normally.
+                retVal = true;
+            }
+        }else{
+            // Child terminated abnormally.
+            retVal = false;
+        }
+    }
 
     va_end(args);
 
-    return true;
+    return retVal;
 }
 
 /**
@@ -93,7 +132,51 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
+    bool retVal = false;
+    pid_t pid = fork();
+
+    // execv()
+    if(pid < 0)
+        retVal = false;
+    else if(pid == 0){
+        // Child process
+        int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+        if(fd < 0){
+            perror("open failed");
+            exit(EXIT_FAILURE);
+        }
+
+        if(dup2(fd, 1) < 0){
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }
+
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+        execv(command[0], command);
+        perror("execv failed");
+        exit(EXIT_FAILURE);
+    }else{
+        // Parent process
+        int status;
+        wait(&status);
+
+        if(WIFEXITED(status)){
+            // printf("Child exited with status: %d\n", WEXITSTATUS(status));
+            if(WEXITSTATUS(status) == EXIT_FAILURE){
+                // Child terminated abnormally.
+                retVal = false;
+            }else{
+                // Child terminated normally.
+                retVal = true;
+            }
+        }else{
+            // Child terminated abnormally.
+            retVal = false;
+        }
+    }
+
     va_end(args);
 
-    return true;
+    return retVal;
 }
