@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <syslog.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #define PORT 9000
 #define BUFFER_SIZE 1024
@@ -12,6 +13,44 @@
 const char *filename = "/var/tmp/aesdsocketdata";
 static int serverFD, clientFD;
 static FILE *file;
+
+void createDeamon(){
+    pid_t pid;
+
+    // Fork child process, and terminate parent process.
+    pid = fork();
+    if(pid < 0){
+        perror("Fork failed");
+        exit(EXIT_FAILURE);
+    }
+    if(pid > 0)
+        exit(EXIT_SUCCESS);
+
+    // Create new session
+    if(setsid() < 0){
+        perror("Setsid failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Fork again
+    pid = fork();
+    if(pid < 0){
+        perror("Fork failed");
+        exit(EXIT_FAILURE);
+    }
+    if(pid > 0)
+        exit(EXIT_SUCCESS);
+
+    umask(0);
+
+    // Close standard in, out
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    open("/dev/null", O_RDONLY);
+    open("/dev/null", O_WRONLY);
+    open("/dev/null", O_RDWR);
+}
 
 void handleSIGINT(int sig){
     syslog(LOG_DEBUG, "Caught signal, exiting");
@@ -68,7 +107,14 @@ char *readUntilNewLind(int clientFD){
         }
 
         // Expand buffer(result)
-        result = realloc(result, totalSize + bytesNum);
+        char *temp = realloc(result, totalSize + bytesNum + 1); // +1 for '\0'
+        if (temp == NULL) {
+            perror("Memory allocation error");
+            free(result);
+            return NULL;
+        }
+        result = temp;
+
         // Copy to buffer(result)
         memcpy(result + totalSize, buffer, bytesNum);
         totalSize += bytesNum;
@@ -81,7 +127,7 @@ char *readUntilNewLind(int clientFD){
     return result;
 }
 
-int main(){
+int main(int argc, const char* argv[]){
     struct sockaddr_in address;
     socklen_t addr_len = sizeof(address);
     char clientIP[INET_ADDRSTRLEN];
@@ -119,7 +165,10 @@ int main(){
         close(serverFD);
         return -1;
     }
-    
+
+    if(argc == 2 && strcmp(argv[1], "-d") == 0)
+        createDeamon();
+
     // Open syslog，named "App aesdsocket"
     openlog("App aesdsocket", LOG_PID | LOG_CONS, LOG_USER);
 
